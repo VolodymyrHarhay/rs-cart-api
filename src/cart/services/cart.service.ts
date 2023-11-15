@@ -131,10 +131,11 @@ export class CartService {
 
   async updateByUserId(userId: string, cartItem: CartItem): Promise<Cart> {
     try {
+      await this.postgresService.beginTransaction();
+
       const cartId = await this.getCartIdByUserId(userId);
-  
       if (!cartId) {
-        throw new Error('Cart not found');
+        throw new Error('Cart not found for the user ID provided.');
       }
 
       if (cartItem.count === 0) {
@@ -142,7 +143,7 @@ export class CartService {
         await this.postgresService.query(deleteQuery, [cartId, cartItem.product.id]);
       } else {
         const existingCartItem = await this.postgresService.query(
-          'SELECT * FROM cart_items WHERE cart_id = $1 AND product_id = $2',
+          'SELECT * FROM cart_items WHERE cart_id = $1 AND product_id = $2 FOR UPDATE',
           [cartId, cartItem.product.id]
         );
     
@@ -160,10 +161,12 @@ export class CartService {
       const updateCartQuery = 'UPDATE carts SET updated_at = NOW() WHERE id = $1 RETURNING id';
       await this.postgresService.query(updateCartQuery, [cartId]);
   
+      await this.postgresService.commitTransaction();
       return await this.findUserCart(userId);
     } catch (error) {
+      await this.postgresService.rollbackTransaction();
       console.error('Error updating cart:', error);
-      throw error;
+      throw new Error(`Error updating cart: ${error.message}`);
     }
   }
 }
