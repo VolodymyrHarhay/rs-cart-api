@@ -18,3 +18,14 @@ export type Order = {
   status: string;
   total: number;
 }
+
+export type CreateOrderDto = {
+  userId: string;
+  cartId: string;
+  items: CartItem[],
+  total: number;
+}
+
+export type UpdateOrderDto = {
+  
+}

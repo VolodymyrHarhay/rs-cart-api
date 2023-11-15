@@ -74,49 +74,23 @@ export class CartController {
   }
 
   // @UseGuards(JwtAuthGuard)
-  // @UseGuards(BasicAuthGuard)
-  // @Delete()
-  // clearUserCart(@Req() req: AppRequest) {
-  //   this.cartService.removeByUserId(getUserIdFromRequest(req));
+  @UseGuards(BasicAuthGuard)
+  @Delete()
+  clearUserCart(@Req() req: AppRequest) {
+    const userId = getUserIdFromRequest(req);
+    this.cartService.removeByUserId(userId);
 
-  //   return {
-  //     statusCode: HttpStatus.OK,
-  //     message: 'OK',
-  //   }
-  // }
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'OK',
+    }
+  }
 
-  // // @UseGuards(JwtAuthGuard)
-  // @UseGuards(BasicAuthGuard)
-  // @Post('checkout')
-  // checkout(@Req() req: AppRequest, @Body() body) {
-  //   const userId = getUserIdFromRequest(req);
-  //   const cart = this.cartService.findByUserId(userId);
 
-  //   if (!(cart && cart.items.length)) {
-  //     const statusCode = HttpStatus.BAD_REQUEST;
-  //     req.statusCode = statusCode
-
-  //     return {
-  //       statusCode,
-  //       message: 'Cart is empty',
-  //     }
-  //   }
-
-  //   const { id: cartId, items } = cart;
-  //   const total = calculateCartTotal(cart);
-  //   const order = this.orderService.create({
-  //     ...body, // TODO: validate and pick only necessary data
-  //     userId,
-  //     cartId,
-  //     items,
-  //     total,
-  //   });
-  //   this.cartService.removeByUserId(userId);
-
-  //   return {
-  //     statusCode: HttpStatus.OK,
-  //     message: 'OK',
-  //     data: { order }
-  //   }
-  // }
+  @UseGuards(BasicAuthGuard)
+  @Post('checkout')
+  async checkout(@Req() req: AppRequest) {
+    const userId = getUserIdFromRequest(req);
+    return await this.cartService.checkout(userId);
+  }
 }

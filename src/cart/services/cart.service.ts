@@ -2,14 +2,21 @@ import { Injectable } from '@nestjs/common';
 import { v4 } from 'uuid';
 import { Cart, CartItem, Product } from '../models';
 import { PostgresService } from '../../postgres.service';
+import { OrderService } from '../../order/services/order.service';
 import { DynamoDB } from 'aws-sdk';
 import AWS from 'aws-sdk';
+import { HttpStatus } from '@nestjs/common';
+
+import { calculateCartTotal } from '../models-rules';
 
 @Injectable()
 export class CartService {
   private readonly docClient: DynamoDB.DocumentClient;
 
-  constructor(private readonly postgresService: PostgresService) {
+  constructor(
+    private readonly postgresService: PostgresService,
+    private readonly orderService: OrderService
+  ) {
     this.docClient = new DynamoDB.DocumentClient({ region: 'eu-north-1' });
   }
 
@@ -27,29 +34,6 @@ export class CartService {
     };
     const productData = await this.docClient.get(paramsProducts).promise();
     const product = productData?.Item as Product;
-
-    // const products = [
-    //   {
-    //     "description": "Description for Book 1",
-    //     "id": "bc84a80e-31ce-4ca6-9816-73272b87ca42",
-    //     "price": 1000,
-    //     "title": "Book 1"
-    //   },
-    //   {
-    //     "description": "Description for Book 2",
-    //     "id": "f655e062-cdd4-40a8-ad66-e442115b6dbb",
-    //     "price": 1500,
-    //     "title": "Book 2"
-    //   },
-    //   {
-    //     "description": "Description for Book 8",
-    //     "id": "c9a16662-0c1a-40c7-b478-02b36c506b85",
-    //     "price": 4000,
-    //     "title": "Book 8"
-    //   },
-    // ];
-
-    // const product = products.find(x => x.id === productId);
 
     if (product) {
       return product;
@@ -168,5 +152,77 @@ export class CartService {
       console.error('Error updating cart:', error);
       throw new Error(`Error updating cart: ${error.message}`);
     }
+  }
+
+  async removeByUserId(userId: string): Promise<void> {
+    try {
+      const cartId = await this.getCartIdByUserId(userId);
+
+      if (!cartId) {
+        throw new Error('Cart not found for the user ID provided.');
+      }
+
+      const deleteQuery = 'DELETE FROM cart_items WHERE cart_id = $1';
+      await this.postgresService.query(deleteQuery, [cartId]);
+
+      const updateCartQuery = 'UPDATE carts SET updated_at = NOW() WHERE id = $1';
+      await this.postgresService.query(updateCartQuery, [cartId]);
+    } catch (error) {
+      console.error('Error removing cart items:', error);
+      throw new Error(`Error removing cart items: ${error.message}`);
+    }
+  }
+
+  async checkout(userId: string): Promise<any> {
+    try {
+      await this.postgresService.beginTransaction();
+
+      const cart = await this.findUserCart(userId);
+
+      if (!(cart && cart.items.length)) {
+        await this.postgresService.rollbackTransaction();
+        return {
+          statusCode: HttpStatus.BAD_REQUEST,
+          message: 'Cart is empty',
+        };
+      }
+
+      const { id: cartId, items } = cart;
+      const total = calculateCartTotal(cart);
+
+      const order = await this.orderService.create({
+        userId,
+        cartId,
+        items,
+        total,
+      });
+
+      if (!order) {
+        await this.postgresService.rollbackTransaction();
+        throw new Error('Failed to create order');
+      }
+
+      await this.removeByUserId(userId);
+      await this.updateCartStatus(cart.id, 'ORDERED');
+
+      await this.postgresService.commitTransaction();
+      return {
+        statusCode: HttpStatus.OK,
+        message: 'OK',
+        data: { order },
+      };
+    } catch (error) {
+      await this.postgresService.rollbackTransaction();
+      console.error('Error during checkout:', error);
+      return {
+        statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Internal Server Error',
+      };
+    }
+  }
+
+  private async updateCartStatus(cartId: string, status: string): Promise<void> {
+    const updateCartQuery = 'UPDATE carts SET status = $1 WHERE id = $2';
+    await this.postgresService.query(updateCartQuery, [status, cartId]);
   }
 }
