@@ -22,9 +22,9 @@ export class CartController {
       const userId = getUserIdFromRequest(req);
       const cart = await this.cartService.findUserCart(userId);
       const cartItems = cart.items;
-      cartItems.sort((x,y) => x.product.title.localeCompare(y.product.title))
+      cartItems?.sort((x,y) => x.product.title.localeCompare(y.product.title))
       if (cart) {
-        return cartItems;
+        return cartItems || [];
           {
           // statusCode: HttpStatus.OK,
           // message: 'OK',
