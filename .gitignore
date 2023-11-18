@@ -36,3 +36,11 @@ lerna-debug.log*
 .elasticbeanstalk/*
 !.elasticbeanstalk/*.cfg.yml
 !.elasticbeanstalk/*.global.yml
+
+# Serverless directories
+.serverless
+
+# esbuild directories
+.esbuild
+
+.env

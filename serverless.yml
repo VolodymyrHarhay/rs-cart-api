@@ -1,0 +1,36 @@
+service: cart-api
+
+plugins:
+  - serverless-offline
+  - serverless-dotenv-plugin
+
+provider:
+  name: aws
+  runtime: nodejs14.x
+  region: eu-north-1
+  vpc:
+    securityGroupIds:
+      - sg-0e4f428ae46398f5b
+    subnetIds:
+      - subnet-08de675f732837690
+      - subnet-0f3f0d9d40895f127
+      - subnet-0c8c4e261e0ffe7b7
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - "dynamodb:GetItem"
+        - "dynamodb:PutItem"
+      Resource: "arn:aws:dynamodb:eu-north-1:688798769247:table/Products"
+
+functions:
+  main:
+    handler: dist/main.handler
+    events:
+      - http:
+          method: ANY
+          path: /
+          cors: true
+      - http:
+          method: ANY
+          path: '{proxy+}'
+          cors: true

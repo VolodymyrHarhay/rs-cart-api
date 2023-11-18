@@ -4,11 +4,12 @@ import { OrderModule } from '../order/order.module';
 
 import { CartController } from './cart.controller';
 import { CartService } from './services';
+import { PostgresService } from '../postgres.service';
 
 
 @Module({
   imports: [ OrderModule ],
-  providers: [ CartService ],
+  providers: [ CartService, PostgresService ],
   controllers: [ CartController ]
 })
 export class CartModule {}
